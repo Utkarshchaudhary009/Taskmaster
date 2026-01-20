@@ -1,0 +1,29 @@
+{
+  "name": "taskmaster-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "tm": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --compile --outfile tm",
+    "setup": "bun run src/index.ts setup"
+  },
+  "dependencies": {
+    "ai": "^6.0.0",
+    "zhipu-ai-provider": "latest",
+    "ai-sdk-provider-gemini-cli": "latest",
+    "@ai-sdk/mcp": "latest",
+    "@clack/prompts": "latest",
+    "picocolors": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "module": "index.ts",
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
