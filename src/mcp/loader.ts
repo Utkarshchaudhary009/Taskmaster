@@ -1,5 +1,5 @@
-import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp';
-import { Experimental_StdioMCPTransport as StdioMCPTransport } from '@ai-sdk/mcp';
+import { createMCPClient } from '@ai-sdk/mcp';
+import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio';
 import type { TaskmasterMCPConfig, MCPServerEntry } from '../config/store';
 
 export async function loadMCPClients(config: TaskmasterMCPConfig) {
@@ -32,27 +32,36 @@ export async function loadMCPClients(config: TaskmasterMCPConfig) {
 
 async function createClientForServer(name: string, server: MCPServerEntry) {
     if (server.url) {
-        // HTTP transport
+        const url = server.url.toLowerCase();
+        
+        if (url.startsWith('sse://') || server.url.includes('/sse') || server.url.includes('?stream=sse')) {
+            return createMCPClient({
+                transport: {
+                    type: 'sse',
+                    url: server.url.replace('sse://', ''),
+                    headers: server.headers,
+                },
+            });
+        }
+        
         return createMCPClient({
             transport: {
                 type: 'http',
                 url: server.url,
                 headers: server.headers,
             },
-            name,
         });
     }
 
     if (server.command) {
-        // stdio transport
-        const transport = new StdioMCPTransport({
+        const transport = new Experimental_StdioMCPTransport({
             command: server.command,
             args: server.args || [],
             env: server.env || {},
             cwd: server.cwd,
         });
 
-        return createMCPClient({ transport, name });
+        return createMCPClient({ transport });
     }
 
     throw new Error(`Server "${name}" has no valid transport configuration`);
