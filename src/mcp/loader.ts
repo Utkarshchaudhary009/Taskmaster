@@ -20,7 +20,10 @@ export async function loadMCPClients(config: TaskmasterMCPConfig) {
                 allTools[`${name}__${toolName}`] = tool;
             }
         } catch (error) {
-            // Silent fail - MCP server not available
+            console.warn(
+                `Failed to connect to MCP server "${name}": `,
+                error instanceof Error ? error.message : String(error)
+            );
         }
     }
 

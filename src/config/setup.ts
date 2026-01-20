@@ -60,12 +60,17 @@ export async function setupCommand(): Promise<void> {
     console.log(pc.cyan('\nStep 2: Gemini CLI Setup'));
 
     // Check if gemini CLI is installed
-    const checkGemini = Bun.spawn(['gemini', '--version'], {
-        stdout: 'pipe',
-        stderr: 'pipe',
-    });
-
-    const geminiInstalled = (await checkGemini.exited) === 0;
+    let geminiInstalled = false;
+    try {
+        const checkGemini = Bun.spawn(['gemini', '--version'], {
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
+        geminiInstalled = (await checkGemini.exited) === 0;
+    } catch (error) {
+        console.warn(`Failed to check for Gemini CLI: ${error instanceof Error ? error.message : String(error)}`);
+        geminiInstalled = false;
+    }
 
     if (!geminiInstalled) {
         console.log(pc.yellow('Gemini CLI not found.'));

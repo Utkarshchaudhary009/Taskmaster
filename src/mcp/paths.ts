@@ -11,14 +11,21 @@ export function getIDEConfigPaths(): Record<MCPSource, string> {
 
   return {
     claude: isWindows
-      ? join(process.env.APPDATA!, 'Claude', 'claude_desktop_config.json')
+      ? (() => {
+          const appData = process.env.APPDATA;
+          if (!appData) {
+            console.warn('APPDATA environment variable not found. Using fallback path.');
+            return join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json');
+          }
+          return join(appData, 'Claude', 'claude_desktop_config.json');
+        })()
       : isMac
         ? join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
         : join(home, '.config', 'Claude', 'claude_desktop_config.json'),
     cursor: join(home, '.cursor', 'mcp.json'),
     windsurf: join(home, '.codeium', 'windsurf', 'mcp_config.json'),
     gemini: join(home, '.gemini', 'settings.json'),
-    vscode: '.vscode/mcp.json', // Relative to workspace
+    vscode: join(home, '.vscode', 'mcp.json'), // Absolute path
     continue: join(home, '.continue', 'config.yaml'),
   };
 }

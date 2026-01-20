@@ -12,6 +12,8 @@ export async function doCommand(prompt: string, heavy: boolean): Promise<void> {
         process.exit(1);
     }
 
+    let clients: Map<string, any> | undefined;
+
     try {
         // Select model based on mode
         const model = heavy ? await getHeavyModel() : await getLightModel();
@@ -21,7 +23,9 @@ export async function doCommand(prompt: string, heavy: boolean): Promise<void> {
 
         // Load MCP tools
         const mcpConfig = await loadMCPConfig();
-        const { clients, tools } = await loadMCPClients(mcpConfig);
+        const mcpResult = await loadMCPClients(mcpConfig);
+        clients = mcpResult.clients;
+        const tools = mcpResult.tools;
 
         // Generate response
         const { text, toolCalls } = await generateText({
@@ -37,11 +41,6 @@ export async function doCommand(prompt: string, heavy: boolean): Promise<void> {
         if (toolCalls && toolCalls.length > 0) {
             console.log(pc.dim(`\n🛠️  ${toolCalls.length} tool(s) used`));
         }
-
-        // Cleanup MCP clients
-        for (const client of clients.values()) {
-            await client.close();
-        }
     } catch (error) {
         if (error instanceof Error) {
             if (error.message.includes('API key')) {
@@ -55,6 +54,17 @@ export async function doCommand(prompt: string, heavy: boolean): Promise<void> {
             }
         } else {
             throw error;
+        }
+    } finally {
+        // Cleanup MCP clients - always runs even if error occurs
+        if (clients) {
+            for (const client of clients.values()) {
+                try {
+                    await client.close();
+                } catch (closeError) {
+                    console.warn('Error closing MCP client:', closeError);
+                }
+            }
         }
     }
 }

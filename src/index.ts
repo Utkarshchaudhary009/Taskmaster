@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'util';
-import { intro, outro, isCancel, cancel } from '@clack/prompts';
+import { intro, outro, isCancel } from '@clack/prompts';
 import pc from 'picocolors';
 import { doCommand } from './commands/do';
 import { syncCommand } from './commands/sync';
