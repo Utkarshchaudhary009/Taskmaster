@@ -1,0 +1,27 @@
+
+{
+  "name": "taskmaster",
+  "version": "1.0.0",
+  "private": true,
+  "description": "High-performance MCP-enabled CLI agent",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --compile --outfile tm",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "ai": "latest",
+    "@ai-sdk/mcp": "latest",
+    "ai-sdk-provider-gemini-cli": "latest",
+    "zhipu-ai-provider": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest"
+  }
+}
