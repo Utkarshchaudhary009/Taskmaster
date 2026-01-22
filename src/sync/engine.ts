@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { IDE_DEFINITIONS } from "../clients/definitions";
 import { ClientDiscovery } from "../clients/discovery";
 import { SecurityValidator } from "../security/validator";
+import { ui } from "../cli/ui";
 import type { GlobalConfig, MCPServerConfig } from "../types";
 
 export class SyncEngine {
@@ -13,8 +14,22 @@ export class SyncEngine {
         this.configPath = join(homedir(), ".taskmaster", "config.json");
     }
 
+    private getNestedValue(obj: Record<string, any>, path: string): any {
+        const keys = path.split(".");
+        let current = obj;
+        for (const key of keys) {
+            if (current && typeof current === "object" && key in current) {
+                current = current[key];
+            } else {
+                return undefined;
+            }
+        }
+        return current;
+    }
+
     async sync() {
-        console.log("🔄 Starting MCP Sync...");
+        ui.header("MCP Sync");
+        ui.info("Scanning for IDE configurations...");
 
         // 1. Load existing
         let registry: Record<string, MCPServerConfig> = {};
@@ -30,47 +45,74 @@ export class SyncEngine {
         const discovery = new ClientDiscovery();
         const clients = await discovery.discoverAll();
         let newConfigs = 0;
+        let foundClients = 0;
+
+        ui.section("Discovered IDEs");
 
         for (const client of clients) {
             if (client.type !== 'file' || !client.configPath) {
-                console.log(`   ℹ️  Skipping CLI-only client: ${client.name} (Sync not support yet)`);
+                ui.item("⏭️", ui.dim(client.name), "(CLI-only, skipped)");
                 continue;
             }
 
+            foundClients++;
             const ideFile = Bun.file(client.configPath);
+            
             try {
-                console.log(`   Found ${client.name} config at ${client.configPath}`);
                 const content = await ideFile.json();
 
-                // Determine the key for MCP servers. Default to 'mcpServers' but fallback if needed
-                // Currently definitions don't store key in ClientDiscovery result, need to look up
+                // Determine the key for MCP servers (supports nested paths like "mcp.servers")
                 const def = Object.values(IDE_DEFINITIONS).find(d => d.name === client.name);
                 const key = def?.mcpKey || "mcpServers";
+                const icon = def?.icon || "📦";
 
-                const servers = content[key];
+                // Handle nested keys like "mcp.servers"
+                const servers = this.getNestedValue(content, key);
 
                 if (servers && typeof servers === 'object') {
-                    for (const [name, config] of Object.entries(servers)) {
-                        // Normalize and validate
+                    const serverCount = Object.keys(servers).length;
+                    ui.item(icon, ui.bold(client.name), `(${serverCount} servers)`);
+
+                    for (const [name, rawConfig] of Object.entries(servers)) {
                         if (!SecurityValidator.validateServerName(name)) {
-                            console.warn(`   ⚠️  Skipping invalid server name: "${name}"`);
+                            ui.item("  ⚠️", ui.yellow(name), "(invalid name, skipped)");
                             continue;
                         }
 
                         if (!registry[name]) {
-                            registry[name] = config as MCPServerConfig;
-                            console.log(`   + Added ${name} from ${client.name}`);
+                            const config = rawConfig as MCPServerConfig;
+                            
+                            // Auto-detect transport type if not specified
+                            if (!config.transport) {
+                                if (config.url) {
+                                    config.transport = config.url.includes("/sse") ? "sse" : "http";
+                                } else if (config.command) {
+                                    config.transport = "stdio";
+                                }
+                            }
+                            
+                            registry[name] = config;
+                            ui.item("  ➕", ui.green(name), "(new)");
                             newConfigs++;
+                        } else {
+                            ui.item("  ✓", ui.dim(name), "(exists)");
                         }
                     }
+                } else {
+                    ui.item(icon, client.name, ui.dim("(no MCP servers)"));
                 }
             } catch (e) {
-                console.error(`   Failed to read ${client.name}:`, e);
+                ui.item("❌", ui.red(client.name), `(read error)`);
             }
         }
 
+        console.log();
+
         // 3. Save
         await Bun.write(this.configPath, JSON.stringify({ mcpRegistry: registry }, null, 2));
-        console.log(`✅ Sync complete. ${newConfigs} new servers added.`);
+        
+        ui.divider();
+        ui.success(`Sync complete: ${newConfigs} new servers from ${foundClients} IDEs`);
+        ui.info(`Total servers in registry: ${Object.keys(registry).length}`);
     }
 }

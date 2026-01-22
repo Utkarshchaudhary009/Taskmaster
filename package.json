@@ -1,20 +1,29 @@
-
 {
   "name": "taskmaster",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "High-performance MCP-enabled CLI agent",
   "main": "src/index.ts",
   "type": "module",
+  "bin": {
+    "tm": "./src/index.ts"
+  },
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --compile --outfile tm",
-    "test": "bun test"
+    "build": "bun run build.ts",
+    "build:standalone": "bun run build.ts --standalone",
+    "dev": "bun run --watch src/index.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "lint": "bunx eslint src/",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "ai": "latest",
     "@ai-sdk/mcp": "latest",
+    "ai": "latest",
     "ai-sdk-provider-gemini-cli": "latest",
+    "tree-sitter-bash": "^0.25.1",
+    "web-tree-sitter": "^0.26.3",
     "zhipu-ai-provider": "latest"
   },
   "peerDependencies": {

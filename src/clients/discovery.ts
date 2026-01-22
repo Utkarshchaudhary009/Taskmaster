@@ -1,6 +1,5 @@
 
 import { IDE_DEFINITIONS } from "./definitions";
-import { SecurityValidator } from "../security/validator";
 
 export interface DiscoveredClient {
     id: string;
@@ -11,15 +10,11 @@ export interface DiscoveredClient {
 }
 
 export class ClientDiscovery {
-    /**
-     * Discover all supported clients on the system
-     */
     async discoverAll(): Promise<DiscoveredClient[]> {
         const results: DiscoveredClient[] = [];
         const platform = process.platform as 'win32' | 'darwin' | 'linux';
 
         for (const [id, def] of Object.entries(IDE_DEFINITIONS)) {
-            // Check file-based config
             if (def.paths && def.paths[platform]) {
                 const path = def.paths[platform];
                 const exists = await Bun.file(path).exists();
@@ -36,11 +31,9 @@ export class ClientDiscovery {
                 }
             }
 
-            // Check CLI availability (if applicable)
-            // For now, checks if binary matches the ID (e.g. 'cursor', 'code')
-            // This is a heuristic.
-            const binName = id.split("-")[0]; // gemini-cli -> gemini
-            if (await Bun.which(binName)) {
+            const binName = id.split("-")[0];
+            const which = await Bun.which(binName);
+            if (which) {
                 results.push({
                     id,
                     name: def.name,

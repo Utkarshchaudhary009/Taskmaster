@@ -1,56 +1,137 @@
 
-import { generateText } from "ai";
+import { streamText, generateText } from "ai";
 import { getHeavyModel } from "../providers/gemini-provider";
 import { getLiteModel } from "../providers/zhipu-provider";
 import { MCPRegistry } from "../mcp/registry";
+import { runWorker, runWorkerSync } from "./worker";
+import { ui } from "../cli/ui";
 
-export async function runOrchestrator(prompt: string, isHeavy: boolean = false) {
+interface OrchestratorDecision {
+    neededMcps: string[];
+    reason: string;
+    parallelTasks?: Array<{
+        mcps: string[];
+        subtask: string;
+    }>;
+}
+
+export async function runOrchestrator(
+    prompt: string, 
+    isHeavy: boolean = false, 
+    enableParallel: boolean = false
+) {
+    ui.header("TaskMaster");
+    
     const registry = new MCPRegistry();
     const allServers = await registry.listAll();
+    const serverNames = allServers.map(s => s.name);
 
-    // 1. Analyze Request
     const model = isHeavy ? getHeavyModel() : getLiteModel();
-    const modelName = isHeavy ? "Gemini Heavy" : "Zhipu Lite";
-    console.log(`🧠 Admin Agent (${modelName}) analyzing: "${prompt}"...`);
+    const modelName = isHeavy ? "Gemini Pro" : "GLM Flash";
+    
+    ui.section(`Orchestrator (${modelName})`);
+    ui.info(`Analyzing: "${prompt.substring(0, 60)}${prompt.length > 60 ? "..." : ""}"`);
 
-    const analysis = await generateText({
-        model: model,
-        prompt: `
-      User Request: "${prompt}"
-      Available MCP Servers: ${JSON.stringify(allServers.map(s => s.name))}
-      
-      Decide which MCP servers are absolutely necessary to fulfill this request.
-      If no MCPs are needed (pure logic/math), return empty list.
-      
-      Output ONLY a JSON object: { "neededMcps": string[], "reason": string }
-    `
-    });
+    const analysisPrompt = enableParallel ? `
+User Request: "${prompt}"
+Available MCP Servers: ${JSON.stringify(serverNames)}
 
-    let decision;
+Analyze this request. If it can be broken into independent parallel subtasks, do so.
+
+Output ONLY a JSON object:
+{
+  "neededMcps": string[],
+  "reason": string,
+  "parallelTasks": [
+    { "mcps": ["server1"], "subtask": "specific task description" }
+  ]
+}
+
+If parallel execution is not beneficial, omit parallelTasks or set to empty array.
+` : `
+User Request: "${prompt}"
+Available MCP Servers: ${JSON.stringify(serverNames)}
+
+Decide which MCP servers are absolutely necessary to fulfill this request.
+If no MCPs are needed (pure logic/math), return empty list.
+
+Output ONLY a JSON object: { "neededMcps": string[], "reason": string }
+`;
+
+    let decision: OrchestratorDecision;
+    
     try {
-        // Basic cleanup of potential markdown code blocks
+        const analysis = await generateText({
+            model,
+            prompt: analysisPrompt
+        });
+
         const text = analysis.text.replace(/```json/g, "").replace(/```/g, "").trim();
         decision = JSON.parse(text);
     } catch (e) {
-        console.error("Failed to parse orchestrator decision:", analysis.text);
+        ui.error("Failed to analyze request. Running directly...");
+        await runWorker({ prompt, model: isHeavy ? "heavy" : "lite" });
         return;
     }
 
-    // 2. Spawn Subagent (The "Worker")
-    const mcpFlag = decision.neededMcps.join(",");
-    console.log(`🤖 Spawning Worker with MCPs: [${mcpFlag || "NONE"}]`);
-    console.log(`   Reason: ${decision.reason}`);
+    ui.item("📋", `Plan: ${decision.reason}`);
+    console.log();
 
-    const args = ["run"];
-    if (mcpFlag) {
-        args.push(`--mcp=${mcpFlag}`);
+    // Check for parallel execution
+    if (enableParallel && decision.parallelTasks && decision.parallelTasks.length > 1) {
+        ui.section("Parallel Execution");
+        ui.info(`Spawning ${decision.parallelTasks.length} parallel workers...`);
+
+        const tasks = decision.parallelTasks.map((task, i) => {
+            ui.item(`🔹`, `Worker ${i + 1}: ${task.subtask.substring(0, 50)}...`);
+            return runWorkerSync({
+                prompt: task.subtask,
+                mcp: task.mcps,
+                model: isHeavy ? "heavy" : "lite",
+                isSubagent: true
+            });
+        });
+
+        console.log();
+        const results = await Promise.all(tasks);
+
+        ui.section("Combining Results");
+        
+        const combinePrompt = `
+Original request: "${prompt}"
+
+Results from parallel workers:
+${results.map((r, i) => `Worker ${i + 1}: ${r}`).join("\n\n")}
+
+Synthesize these results into a coherent final answer.
+`;
+
+        const stream = streamText({
+            model,
+            prompt: combinePrompt
+        });
+
+        for await (const chunk of stream.textStream) {
+            ui.streamToken(chunk);
+        }
+        ui.streamEnd();
+        
+    } else {
+        // Sequential execution with streaming
+        ui.section("Executing");
+        
+        if (decision.neededMcps.length > 0) {
+            ui.info(`Using MCPs: ${decision.neededMcps.join(", ")}`);
+        } else {
+            ui.info("No external tools needed");
+        }
+        console.log();
+
+        await runWorker({
+            prompt,
+            mcp: decision.neededMcps,
+            model: isHeavy ? "heavy" : "lite",
+            isSubagent: false
+        });
     }
-    args.push(prompt);
-
-    // Spawn self as worker
-    const proc = Bun.spawn([process.argv[0], process.argv[1], ...args], {
-        stdio: ["inherit", "inherit", "inherit"]
-    });
-
-    await proc.exited;
 }

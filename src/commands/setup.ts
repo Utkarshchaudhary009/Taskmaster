@@ -46,7 +46,7 @@ export async function runSetupTour() {
     console.log("\n[3/4] Verifying Zhipu AI Provider...");
     const storage = new TokenStorage();
     let zhipuTokens = await storage.get("zhipu");
-    let apiKey = process.env.ZHIPU_API_KEY || zhipuTokens?.apiKey;
+    let apiKey = process.env["ZHIPU_API_KEY"] || zhipuTokens?.apiKey;
 
     if (apiKey) {
         console.log("   ✅ Zhipu API Key found.");
