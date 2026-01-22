@@ -33,5 +33,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # TaskMaster local storage
 .taskmaster/
 
+# Agent and Research
+.agent/
+research/
+
 # Finder (MacOS) folder config
 .DS_Store
