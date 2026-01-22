@@ -150,6 +150,12 @@ export const ui = {
     streamEnd: () => {
         console.log();
         console.log();
+    },
+
+    ask: async (question: string): Promise<string> => {
+        const prompt = require("prompt-sync")({ sigint: true });
+        console.log(`${COLORS.bold}${COLORS.cyan}?${COLORS.reset} ${question}`);
+        return prompt(`  ${COLORS.dim}›${COLORS.reset} `);
     }
 };
 

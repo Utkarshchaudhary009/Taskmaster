@@ -66,4 +66,21 @@ export class MCPRegistry {
             await Bun.write(this.configPath, JSON.stringify({ mcpRegistry: {} }, null, 2));
         }
     }
+
+    /**
+     * Add or update a server configuration
+     */
+    async addServer(name: string, config: MCPServerConfig) {
+        const current = await this.loadConfig();
+        current.mcpRegistry[name] = config;
+        
+        // Ensure directory exists
+        const dir = join(homedir(), ".taskmaster");
+        const { mkdirSync } = await import("fs");
+        if (!await Bun.file(dir).exists()) {
+             mkdirSync(dir, { recursive: true });
+        }
+
+        await Bun.write(this.configPath, JSON.stringify(current, null, 2));
+    }
 }

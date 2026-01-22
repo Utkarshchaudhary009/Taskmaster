@@ -141,6 +141,14 @@
 
 ### 9. Additional Research Files
 
+#### bash-tool Deep Dive
+**File**: `bash-tool-deep-dive.md` (Comprehensive)
+**Content**: Analysis of the `bash-tool` package for safe shell execution in AI agents, covering `just-bash` vs `@vercel/sandbox` and the experimental Skills system.
+
+#### AI SDK 6 Agents Deep Dive
+**File**: `ai-sdk-agents-deep-dive.md` (Comprehensive)
+**Content**: Deep dive into AI SDK v6 Agents, ToolLoopAgent, Loop Control, and @ai-sdk/openai-compatible provider integration.
+
 #### AI SDK MCP Deep Dive
 **File**: `ai-sdk-mcp-deep-dive.md` (6 KB)  
 **Content**: Vercel AI SDK version 6 MCP integration details

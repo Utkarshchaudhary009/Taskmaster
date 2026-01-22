@@ -1,7 +1,6 @@
 
 import { streamText } from "ai";
-import { getLiteModel } from "../../providers/zhipu-provider";
-import { getHeavyModel } from "../../providers/gemini-provider";
+import { getLiteModel, getHeavyModel, getLiteModelName, getHeavyModelName } from "../../providers";
 import { ui } from "../../cli/ui";
 
 const GIT_SYSTEM_PROMPT = `You are a Git CLI specialist. You help users with Git operations.
@@ -33,8 +32,8 @@ export interface GitAgentConfig {
 }
 
 export async function runGitAgent(config: GitAgentConfig): Promise<string> {
-    const model = config.model === "heavy" ? getHeavyModel() : getLiteModel();
-    
+    const model = config.model === "heavy" ? await getHeavyModel() : await getLiteModel();
+
     ui.section("Git Agent");
     ui.info("Analyzing Git request...");
 
@@ -76,13 +75,13 @@ function extractGitCommands(text: string): string[] {
     const codeBlockRegex = /```(?:bash|sh|shell)?\n(git[^\n`]+)/g;
     const commands: string[] = [];
     let match;
-    
+
     while ((match = codeBlockRegex.exec(text)) !== null) {
         if (match[1]) {
             commands.push(match[1].trim());
         }
     }
-    
+
     return commands;
 }
 
@@ -98,7 +97,7 @@ async function executeGitCommand(command: string): Promise<void> {
     ];
 
     const isDangerous = dangerousPatterns.some(p => p.test(command));
-    
+
     if (isDangerous) {
         ui.warning(`Skipping dangerous command: ${command}`);
         ui.item("💡", "Run manually if intended");
@@ -106,21 +105,21 @@ async function executeGitCommand(command: string): Promise<void> {
     }
 
     ui.item("▶️", ui.cyan(command));
-    
+
     try {
         const parts = command.split(" ");
         const result = Bun.spawnSync(parts, {
             stdout: "pipe",
             stderr: "pipe"
         });
-        
+
         if (result.stdout.length > 0) {
             console.log(result.stdout.toString());
         }
         if (result.stderr.length > 0) {
             console.log(ui.yellow(result.stderr.toString()));
         }
-        
+
         if (result.exitCode === 0) {
             ui.success("Command completed");
         } else {

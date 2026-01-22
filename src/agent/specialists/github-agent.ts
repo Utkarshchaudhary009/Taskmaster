@@ -1,7 +1,6 @@
 
 import { streamText } from "ai";
-import { getLiteModel } from "../../providers/zhipu-provider";
-import { getHeavyModel } from "../../providers/gemini-provider";
+import { getLiteModel, getHeavyModel } from "../../providers";
 import { loadMcpTools } from "../../mcp/loader";
 import { ui } from "../../cli/ui";
 
@@ -34,13 +33,13 @@ export interface GitHubAgentConfig {
 }
 
 export async function runGitHubAgent(config: GitHubAgentConfig): Promise<string> {
-    const model = config.model === "heavy" ? getHeavyModel() : getLiteModel();
-    
+    const model = config.model === "heavy" ? await getHeavyModel() : await getLiteModel();
+
     ui.section("GitHub Agent");
     ui.info("Processing GitHub request...");
 
     let tools = {};
-    
+
     if (config.useMcp) {
         try {
             tools = await loadMcpTools(["github"]);
@@ -101,7 +100,7 @@ export async function runGhCommand(args: string[]): Promise<{ stdout: string; st
             stdout: "pipe",
             stderr: "pipe"
         });
-        
+
         return {
             stdout: result.stdout.toString(),
             stderr: result.stderr.toString(),

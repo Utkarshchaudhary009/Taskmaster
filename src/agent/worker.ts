@@ -1,22 +1,29 @@
 
 import { streamText, generateText } from "ai";
-import { getLiteModel } from "../providers/zhipu-provider";
-import { getHeavyModel } from "../providers/gemini-provider";
+import { getLiteModel, getHeavyModel, getLiteModelName, getHeavyModelName } from "../providers";
 import { loadMcpTools } from "../mcp/loader";
 import { ui } from "../cli/ui";
+import { shellTools } from "../tools";
 import type { TaskArgs } from "../types";
 
 export async function runWorker(config: TaskArgs): Promise<string> {
-    const tools = await loadMcpTools(config.mcp);
+    const mcpTools = await loadMcpTools(config.mcp);
 
-    const model = config.model === "heavy" ? getHeavyModel() : getLiteModel();
-    const modelName = config.model === "heavy" ? "Gemini Pro" : "GLM Flash";
+    // Merge MCP tools with shell tools
+    const tools = {
+        ...mcpTools,
+        ...shellTools,
+    };
+
+    const model = config.model === "heavy" ? await getHeavyModel() : await getLiteModel();
+    const modelName = config.model === "heavy" ? await getHeavyModelName() : await getLiteModelName();
 
     if (!config.isSubagent) {
         ui.section(`Worker (${modelName})`);
         if (config.mcp?.length) {
             ui.info(`Tools: ${config.mcp.join(", ")}`);
         }
+        ui.info("Shell tools enabled");
     }
 
     try {
@@ -58,8 +65,9 @@ export async function runWorker(config: TaskArgs): Promise<string> {
 }
 
 export async function runWorkerSync(config: TaskArgs): Promise<string> {
-    const tools = await loadMcpTools(config.mcp);
-    const model = config.model === "heavy" ? getHeavyModel() : getLiteModel();
+    const mcpTools = await loadMcpTools(config.mcp);
+    const tools = { ...mcpTools, ...shellTools };
+    const model = config.model === "heavy" ? await getHeavyModel() : await getLiteModel();
 
     try {
         const result = await generateText({
@@ -73,3 +81,4 @@ export async function runWorkerSync(config: TaskArgs): Promise<string> {
         return `Error: ${e.message}`;
     }
 }
+

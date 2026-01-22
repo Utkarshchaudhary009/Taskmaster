@@ -1,10 +1,10 @@
 
 import { streamText, generateText } from "ai";
-import { getHeavyModel } from "../providers/gemini-provider";
-import { getLiteModel } from "../providers/zhipu-provider";
+import { getLiteModel, getHeavyModel, getLiteModelName, getHeavyModelName } from "../providers";
 import { MCPRegistry } from "../mcp/registry";
 import { runWorker, runWorkerSync } from "./worker";
 import { ui } from "../cli/ui";
+import { shellTools } from "../tools";
 
 interface OrchestratorDecision {
     neededMcps: string[];
@@ -16,21 +16,22 @@ interface OrchestratorDecision {
 }
 
 export async function runOrchestrator(
-    prompt: string, 
-    isHeavy: boolean = false, 
+    prompt: string,
+    isHeavy: boolean = false,
     enableParallel: boolean = false
 ) {
     ui.header("TaskMaster");
-    
+
     const registry = new MCPRegistry();
     const allServers = await registry.listAll();
     const serverNames = allServers.map(s => s.name);
 
-    const model = isHeavy ? getHeavyModel() : getLiteModel();
-    const modelName = isHeavy ? "Gemini Pro" : "GLM Flash";
-    
+    const model = isHeavy ? await getHeavyModel() : await getLiteModel();
+    const modelName = isHeavy ? await getHeavyModelName() : await getLiteModelName();
+
     ui.section(`Orchestrator (${modelName})`);
     ui.info(`Analyzing: "${prompt.substring(0, 60)}${prompt.length > 60 ? "..." : ""}"`);
+
 
     const analysisPrompt = enableParallel ? `
 User Request: "${prompt}"
@@ -59,7 +60,7 @@ Output ONLY a JSON object: { "neededMcps": string[], "reason": string }
 `;
 
     let decision: OrchestratorDecision;
-    
+
     try {
         const analysis = await generateText({
             model,
@@ -96,7 +97,7 @@ Output ONLY a JSON object: { "neededMcps": string[], "reason": string }
         const results = await Promise.all(tasks);
 
         ui.section("Combining Results");
-        
+
         const combinePrompt = `
 Original request: "${prompt}"
 
@@ -115,11 +116,11 @@ Synthesize these results into a coherent final answer.
             ui.streamToken(chunk);
         }
         ui.streamEnd();
-        
+
     } else {
         // Sequential execution with streaming
         ui.section("Executing");
-        
+
         if (decision.neededMcps.length > 0) {
             ui.info(`Using MCPs: ${decision.neededMcps.join(", ")}`);
         } else {
